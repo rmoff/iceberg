@@ -110,8 +110,9 @@ jobs:
     # ------------------------------------------------------------------
     # Trivy CVE scan (JVM 21 only — dependency CVEs are JVM-independent)
     #
-    # Scans bundled jars for CRITICAL/HIGH vulnerabilities. This is
-    # report-only and does NOT fail the build (exit-code: '0').
+    # Scans bundled jars for CRITICAL/HIGH vulnerabilities.
+    # The scan step shows as red when CVEs are found, but does not block
+    # the overall CI job (continue-on-error: true).
     # On push: results are uploaded as SARIF to GitHub's Security tab.
     # On PRs: results are printed to the CI log for visibility.
     # ------------------------------------------------------------------
@@ -129,6 +130,7 @@ jobs:
           -d /tmp/kafka-connect-scan
     - name: Run Trivy vulnerability scan
       if: matrix.jvm == 21
+      continue-on-error: true
       uses: aquasecurity/trivy-action@e368e328979b113139d6f9068e03accaed98a518 # v0.34.1
       with:
         scan-type: 'fs'
@@ -136,7 +138,7 @@ jobs:
         scanners: 'vuln'
         severity: 'CRITICAL,HIGH'
         ignore-unfixed: true
-        exit-code: '0'
+        exit-code: '1'
     - name: Run Trivy vulnerability scan (SARIF)
       if: matrix.jvm == 21 && github.event_name == 'push'
       uses: aquasecurity/trivy-action@e368e328979b113139d6f9068e03accaed98a518 # v0.34.1
