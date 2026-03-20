@@ -25,6 +25,7 @@ on:
     - '0.*'
     - '1.*'
     - '2.*'
+    - 'trivy-test-*'    # temporary: testing push-event behaviour on fork
     tags:
     - 'apache-iceberg-**'
   pull_request:
@@ -108,13 +109,25 @@ jobs:
         path: |
           **/build/testlogs
     # ------------------------------------------------------------------
-    # Trivy CVE scan (JVM 21 only — dependency CVEs are JVM-independent)
+    # Trivy CVE scan
     #
     # Scans bundled jars for CRITICAL/HIGH vulnerabilities.
-    # The scan step shows as red when CVEs are found, but does not block
-    # the overall CI job (continue-on-error: true).
-    # On push: results are uploaded as SARIF to GitHub's Security tab.
-    # On PRs: results are printed to the CI log for visibility.
+    # Only runs on JVM 21 — dependency CVEs are JVM-independent so
+    # a single scan avoids redundant work.
+    #
+    # Behaviour:
+    #   - Flag, don't block: the scan step uses exit-code 1 so it
+    #     "fails" when CVEs are found, but continue-on-error keeps
+    #     the overall job green. GitHub Actions shows the step with
+    #     an orange warning icon. This is the only mechanism Actions
+    #     provides for "visible but non-blocking" — there is no way
+    #     to show a red step while keeping the job green.
+    #   - On push to main/release branches: a second scan generates
+    #     SARIF output which is uploaded to the GitHub Security tab
+    #     for ongoing tracking.
+    #   - On PRs: SARIF upload is skipped because GitHub's Security
+    #     tab only accepts results from default/protected branches.
+    #     CVE findings are visible in the CI log output instead.
     # ------------------------------------------------------------------
     - name: Build Kafka Connect distribution for scanning
       if: matrix.jvm == 21
@@ -128,6 +141,9 @@ jobs:
         mkdir -p /tmp/kafka-connect-scan
         unzip kafka-connect/kafka-connect-runtime/build/distributions/iceberg-kafka-connect-runtime-*.zip \
           -d /tmp/kafka-connect-scan
+    # Scan and print results to CI log. exit-code 1 means the step
+    # fails when CVEs are found; continue-on-error means the job
+    # continues and the step shows as orange (not red) in the UI.
     - name: Run Trivy vulnerability scan
       if: matrix.jvm == 21
       continue-on-error: true
@@ -139,6 +155,11 @@ jobs:
         severity: 'CRITICAL,HIGH'
         ignore-unfixed: true
         exit-code: '1'
+    # Generate SARIF for the GitHub Security tab (push only).
+    # No exit-code set (defaults to 0, always succeeds) because this
+    # step only needs to produce the file — pass/fail signalling is
+    # handled by the scan step above. No continue-on-error needed
+    # either, since this step never fails.
     - name: Run Trivy vulnerability scan (SARIF)
       if: matrix.jvm == 21 && github.event_name == 'push'
       uses: aquasecurity/trivy-action@e368e328979b113139d6f9068e03accaed98a518 # v0.34.1
@@ -150,7 +171,6 @@ jobs:
         output: 'trivy-results.sarif'
         severity: 'CRITICAL,HIGH'
         ignore-unfixed: true
-        exit-code: '0'
     - name: Upload Trivy results to GitHub Security tab
       if: matrix.jvm == 21 && github.event_name == 'push'
       uses: github/codeql-action/upload-sarif@c4a7bc332abaec03596ff2803dd7f3ca3a238975 # v3
