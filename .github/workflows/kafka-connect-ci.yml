@@ -156,6 +156,8 @@ jobs:
         ignore-unfixed: true
         exit-code: '1'
     # Generate SARIF for the GitHub Security tab (push only).
+    # skip-setup-trivy: true — Trivy is already installed by the
+    # previous scan step; reinstalling causes a binary conflict.
     # exit-code: 0 is required — without it trivy exits 1 when CVEs
     # are found, which would fail this step. This step only needs to
     # produce the SARIF file; pass/fail signalling is handled by the
@@ -173,6 +175,7 @@ jobs:
         severity: 'CRITICAL,HIGH'
         ignore-unfixed: true
         exit-code: '0'
+        skip-setup-trivy: 'true'
     - name: Upload Trivy results to GitHub Security tab
       if: matrix.jvm == 21 && github.event_name == 'push'
       uses: github/codeql-action/upload-sarif@c4a7bc332abaec03596ff2803dd7f3ca3a238975 # v3
