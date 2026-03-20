@@ -156,26 +156,22 @@ jobs:
         ignore-unfixed: true
         exit-code: '1'
     # Generate SARIF for the GitHub Security tab (push only).
-    # skip-setup-trivy: true — Trivy is already installed by the
-    # previous scan step; reinstalling causes a binary conflict.
-    # exit-code: 0 is required — without it trivy exits 1 when CVEs
-    # are found, which would fail this step. This step only needs to
-    # produce the SARIF file; pass/fail signalling is handled by the
-    # scan step above. No continue-on-error needed since exit-code 0
-    # means this step always succeeds.
-    - name: Run Trivy vulnerability scan (SARIF)
+    # Re-runs the scan with SARIF output using the trivy binary already
+    # installed by trivy-action above. We call trivy directly instead
+    # of using the action a second time because the action's setup step
+    # fails when trivy is already installed (binary path conflict).
+    # exit-code 0 ensures this step always succeeds — pass/fail
+    # signalling is handled by the scan step above.
+    - name: Generate Trivy SARIF report
       if: matrix.jvm == 21 && github.event_name == 'push'
-      uses: aquasecurity/trivy-action@e368e328979b113139d6f9068e03accaed98a518 # v0.34.1
-      with:
-        scan-type: 'fs'
-        scan-ref: '/tmp/kafka-connect-scan'
-        scanners: 'vuln'
-        format: 'sarif'
-        output: 'trivy-results.sarif'
-        severity: 'CRITICAL,HIGH'
-        ignore-unfixed: true
-        exit-code: '0'
-        skip-setup-trivy: 'true'
+      run: |
+        trivy fs /tmp/kafka-connect-scan \
+          --scanners vuln \
+          --format sarif \
+          --output trivy-results.sarif \
+          --severity CRITICAL,HIGH \
+          --ignore-unfixed \
+          --exit-code 0
     - name: Upload Trivy results to GitHub Security tab
       if: matrix.jvm == 21 && github.event_name == 'push'
       uses: github/codeql-action/upload-sarif@c4a7bc332abaec03596ff2803dd7f3ca3a238975 # v3
