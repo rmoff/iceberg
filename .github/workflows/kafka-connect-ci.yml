@@ -165,7 +165,7 @@ jobs:
     - name: Generate Trivy SARIF report
       if: matrix.jvm == 21 && github.event_name == 'push'
       run: |
-        trivy fs /tmp/kafka-connect-scan \
+        $HOME/.local/bin/trivy-bin/trivy fs /tmp/kafka-connect-scan \
           --scanners vuln \
           --format sarif \
           --output trivy-results.sarif \
