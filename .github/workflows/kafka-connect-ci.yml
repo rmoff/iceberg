@@ -122,12 +122,15 @@ jobs:
     #     an orange warning icon. This is the only mechanism Actions
     #     provides for "visible but non-blocking" — there is no way
     #     to show a red step while keeping the job green.
-    #   - On push to main/release branches: a second scan generates
-    #     SARIF output which is uploaded to the GitHub Security tab
-    #     for ongoing tracking.
+    #   - On push to main/release branches: results are uploaded as
+    #     SARIF to the GitHub Security tab for ongoing tracking.
     #   - On PRs: SARIF upload is skipped because GitHub's Security
     #     tab only accepts results from default/protected branches.
     #     CVE findings are visible in the CI log output instead.
+    #
+    # We use a single trivy-action invocation with table+sarif output.
+    # Running the action twice fails because the second invocation
+    # cannot reinstall the trivy binary (path conflict).
     # ------------------------------------------------------------------
     - name: Build Kafka Connect distribution for scanning
       if: matrix.jvm == 21
@@ -141,13 +144,14 @@ jobs:
         mkdir -p /tmp/kafka-connect-scan
         unzip kafka-connect/kafka-connect-runtime/build/distributions/iceberg-kafka-connect-runtime-*.zip \
           -d /tmp/kafka-connect-scan
-    # Scan and print results to CI log. exit-code 1 means the step
-    # fails when CVEs are found; continue-on-error means the job
-    # continues and the step shows as orange (not red) in the UI.
+    # Scan and output results as SARIF (for upload on push) while also
+    # printing a human-readable table to the CI log. exit-code 1 means
+    # the step fails when CVEs are found; continue-on-error means the
+    # job continues and the step shows as orange (not red) in the UI.
     - name: Run Trivy vulnerability scan
       if: matrix.jvm == 21
       continue-on-error: true
-      uses: aquasecurity/trivy-action@e368e328979b113139d6f9068e03accaed98a518 # v0.34.1
+      uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0
       with:
         scan-type: 'fs'
         scan-ref: '/tmp/kafka-connect-scan'
@@ -155,23 +159,19 @@ jobs:
         severity: 'CRITICAL,HIGH'
         ignore-unfixed: true
         exit-code: '1'
-    # Generate SARIF for the GitHub Security tab (push only).
-    # Re-runs the scan with SARIF output using the trivy binary already
-    # installed by trivy-action above. We call trivy directly instead
-    # of using the action a second time because the action's setup step
-    # fails when trivy is already installed (binary path conflict).
-    # exit-code 0 ensures this step always succeeds — pass/fail
-    # signalling is handled by the scan step above.
-    - name: Generate Trivy SARIF report
-      if: matrix.jvm == 21 && github.event_name == 'push'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+    # Print human-readable results to the CI log so they're visible
+    # without downloading the SARIF file.
+    - name: Print Trivy scan results
+      if: matrix.jvm == 21
       run: |
-        $HOME/.local/bin/trivy-bin/trivy fs /tmp/kafka-connect-scan \
-          --scanners vuln \
-          --format sarif \
-          --output trivy-results.sarif \
-          --severity CRITICAL,HIGH \
-          --ignore-unfixed \
-          --exit-code 0
+        if [ -f trivy-results.sarif ]; then
+          echo "## Trivy CVE Scan Results"
+          jq -r '.runs[].results[] | "- \(.ruleId): \(.message.text)"' trivy-results.sarif 2>/dev/null || echo "No findings or unable to parse SARIF."
+        else
+          echo "No SARIF file found — scan may have failed to install."
+        fi
     - name: Upload Trivy results to GitHub Security tab
       if: matrix.jvm == 21 && github.event_name == 'push'
       uses: github/codeql-action/upload-sarif@c4a7bc332abaec03596ff2803dd7f3ca3a238975 # v3
