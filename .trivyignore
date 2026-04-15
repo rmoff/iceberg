@@ -1,5 +1,0 @@
-# Temporary: suppress known CVEs to test happy-path (no findings) scenario
-GHSA-72hv-8253-57qq
-CVE-2025-67721
-CVE-2026-33870
-CVE-2026-33871
