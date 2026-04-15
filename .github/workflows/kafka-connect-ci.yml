@@ -25,7 +25,6 @@ on:
     - '0.*'
     - '1.*'
     - '2.*'
-    - 'trivy-test-*'
     tags:
     - 'apache-iceberg-**'
   pull_request:
@@ -128,9 +127,9 @@ jobs:
     #     tab only accepts results from default/protected branches.
     #     CVE findings are visible in the CI log output instead.
     #
-    # We use a single trivy-action invocation with table+sarif output.
-    # Running the action twice fails because the second invocation
-    # cannot reinstall the trivy binary (path conflict).
+    # We use limit-severities-for-sarif so the severity filter applies
+    # to both SARIF output and exit code. Without it, the action unsets
+    # TRIVY_SEVERITY for SARIF, causing exit-code 1 even for MEDIUM CVEs.
     # ------------------------------------------------------------------
     - name: Build Kafka Connect distribution for scanning
       if: matrix.jvm == 21
@@ -144,27 +143,6 @@ jobs:
         mkdir -p /tmp/kafka-connect-scan
         unzip kafka-connect/kafka-connect-runtime/build/distributions/iceberg-kafka-connect-runtime-*.zip \
           -d /tmp/kafka-connect-scan
-    # TEMP DIAGNOSTIC: test trivy --exit-code behavior directly in CI
-    - name: 'DIAG: trivy exit-code test'
-      if: matrix.jvm == 21
-      run: |
-        echo "=== Test 1: trivy 0.69.3 rootfs --exit-code 1 (table format) ==="
-        docker run --rm -v /tmp/kafka-connect-scan:/scan:ro \
-          aquasec/trivy:0.69.3 rootfs --exit-code 1 --scanners vuln --no-progress /scan \
-          2>&1 | tail -5
-        echo "EXIT_TABLE=$?"
-        echo ""
-        echo "=== Test 2: trivy 0.69.3 rootfs --exit-code 1 (sarif format) ==="
-        docker run --rm -v /tmp/kafka-connect-scan:/scan:ro \
-          aquasec/trivy:0.69.3 rootfs --exit-code 1 --scanners vuln --format sarif --no-progress /scan \
-          > /dev/null 2>&1
-        echo "EXIT_SARIF=$?"
-        echo ""
-        echo "=== Test 3: trivy 0.69.3 via env var TRIVY_EXIT_CODE=1 ==="
-        docker run --rm -e TRIVY_EXIT_CODE=1 -v /tmp/kafka-connect-scan:/scan:ro \
-          aquasec/trivy:0.69.3 rootfs --scanners vuln --no-progress /scan \
-          2>&1 | tail -3
-        echo "EXIT_ENV=$?"
     # Scan and output results as SARIF (for upload on push) while also
     # printing a human-readable table to the CI log. exit-code 1 means
     # the step fails when CVEs are found; continue-on-error means the
@@ -178,6 +156,7 @@ jobs:
         scan-ref: '/tmp/kafka-connect-scan'
         scanners: 'vuln'
         severity: 'CRITICAL,HIGH'
+        limit-severities-for-sarif: true
         ignore-unfixed: true
         exit-code: '1'
         format: 'sarif'
