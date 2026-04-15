@@ -25,6 +25,7 @@ on:
     - '0.*'
     - '1.*'
     - '2.*'
+    - 'trivy-test-*'
     tags:
     - 'apache-iceberg-**'
   pull_request:
