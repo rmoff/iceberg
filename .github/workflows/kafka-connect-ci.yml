@@ -152,6 +152,7 @@ jobs:
         scan-type: 'rootfs'
         scan-ref: '/tmp/kafka-connect-scan'
         scanners: 'vuln'
+        trivyignores: '.trivyignore'
         ignore-unfixed: true
         exit-code: '1'
         format: 'sarif'
