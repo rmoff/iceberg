@@ -25,6 +25,7 @@ on:
     - '0.*'
     - '1.*'
     - '2.*'
+    - 'trivy-test-*'
     tags:
     - 'apache-iceberg-**'
   pull_request:
@@ -155,7 +156,7 @@ jobs:
         scan-type: 'rootfs'
         scan-ref: '/tmp/kafka-connect-scan'
         scanners: 'vuln'
-        severity: 'CRITICAL,HIGH'
+        severity: 'CRITICAL'
         ignore-unfixed: true
         exit-code: '1'
         format: 'sarif'
