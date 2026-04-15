@@ -110,7 +110,7 @@ jobs:
     # ------------------------------------------------------------------
     # Trivy CVE scan
     #
-    # Scans bundled jars for CRITICAL/HIGH vulnerabilities.
+    # Scans bundled jars for known vulnerabilities.
     # Only runs on JVM 21 — dependency CVEs are JVM-independent so
     # a single scan avoids redundant work.
     #
@@ -126,10 +126,6 @@ jobs:
     #   - On PRs: SARIF upload is skipped because GitHub's Security
     #     tab only accepts results from default/protected branches.
     #     CVE findings are visible in the CI log output instead.
-    #
-    # We use limit-severities-for-sarif so the severity filter applies
-    # to both SARIF output and exit code. Without it, the action unsets
-    # TRIVY_SEVERITY for SARIF, causing exit-code 1 even for MEDIUM CVEs.
     # ------------------------------------------------------------------
     - name: Build Kafka Connect distribution for scanning
       if: matrix.jvm == 21
@@ -144,7 +140,7 @@ jobs:
         unzip kafka-connect/kafka-connect-runtime/build/distributions/iceberg-kafka-connect-runtime-*.zip \
           -d /tmp/kafka-connect-scan
     # Scan and output results as SARIF (for upload on push) while also
-    # printing a human-readable table to the CI log. exit-code 1 means
+    # printing a human-readable summary to the CI log. exit-code 1 means
     # the step fails when CVEs are found; continue-on-error means the
     # job continues and the step shows as orange (not red) in the UI.
     - name: Run Trivy vulnerability scan
@@ -155,8 +151,6 @@ jobs:
         scan-type: 'rootfs'
         scan-ref: '/tmp/kafka-connect-scan'
         scanners: 'vuln'
-        severity: 'CRITICAL,HIGH'
-        limit-severities-for-sarif: true
         ignore-unfixed: true
         exit-code: '1'
         format: 'sarif'
