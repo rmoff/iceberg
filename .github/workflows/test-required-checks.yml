@@ -8,8 +8,10 @@ jobs:
   passing-job:
     runs-on: ubuntu-latest
     steps:
-      - name: This passes
-        run: echo "All good"
+      - name: This fails too
+        run: |
+          echo "Required check failing"
+          exit 1
 
   failing-job:
     runs-on: ubuntu-latest
