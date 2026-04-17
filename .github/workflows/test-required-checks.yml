@@ -1,0 +1,20 @@
+name: Test Required Checks
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  passing-job:
+    runs-on: ubuntu-latest
+    steps:
+      - name: This passes
+        run: echo "All good"
+
+  failing-job:
+    runs-on: ubuntu-latest
+    steps:
+      - name: This fails
+        run: |
+          echo "Simulating a CVE scan failure"
+          exit 1
